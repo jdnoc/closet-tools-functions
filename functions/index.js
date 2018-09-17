@@ -9,7 +9,7 @@ const db = admin.firestore()
 // Disable deprecated features
 db.settings({
     timestampsInSnapshots: true
-});
+})
 
 //create customer
     //create stripe customer
@@ -78,12 +78,41 @@ exports.create = functions.auth.user().onCreate((user) => {
     .catch((error) => {
         // Deal with an error
         console.error("Error writing document: ", error)
-    });
-});
+    })
+})
 
 //upgrade 
     //[if within free trial, just add payment source and trial_end_now: true]
     //[if after free trial, create a subscription and charge using payment source (update customer source)]
+exports.upgrade = functions.https.onRequest((req, res) => {
+    const user_email = req.body.stripeEmail;
+    const source_token = req.body.stripeToken;
+    var free_trial_active;
+    var customer_id;
+    var subscription_id;
+
+    admin.auth().getUserByEmail(email)
+    .then(function(userRecord) {
+        // See the UserRecord reference doc for the contents of userRecord.
+        console.log("Successfully fetched user data for " + userRecord.email);
+        return db.collection(userRecord.uid).doc('stripe').get()
+    })
+    // .then(doc => {
+    //     customer_id = doc.data().stripe.cust_id
+    //     subscription_id = doc.data().stripe.cust_id
+    //     //Update the payment source
+    //     stripe.customers.createSource(customer_id, {            
+    //         source: req.body.stripeToken 
+    //     })
+    // })
+    // .then(function(card) {
+
+    // })
+    .catch(function(error) {
+        console.log("Error fetching user data:", error);
+    })
+
+})
 
 //cancel subscription 
     //[update to delete subscription on end date]
