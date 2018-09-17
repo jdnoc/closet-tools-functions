@@ -1,6 +1,6 @@
 const functions = require('firebase-functions')
 const admin = require('firebase-admin')
-const stripe = require('stripe')('sk_test_ipbpSc5hdCCqcpbPDWs8bt65');
+const stripe = require('stripe')(functions.config().stripe.secret_key);
 admin.initializeApp()
 
 //Initialize Cloud Firestore
@@ -11,25 +11,33 @@ db.settings({
     timestampsInSnapshots: true
 });
 
+//create customer
+    //create stripe customer
+    //start subscription without payment
+    //add default parameters to firestore
+
 exports.create = functions.auth.user().onCreate((user) => {
     const userRef = db.collection('users').doc(user.uid)
     var customer_id;
     var subscription_id;
+    console.log(user.email + " created an account.")
     // Create a new customer and then a new subscription for that customer:
-    stripe.customers.create({
+    return stripe.customers.create({
         email: user.email
     })
     .then((customer) => {
+        console.log("Stripe account created: " + customer.id)
         // start subscription
         customer_id = customer.id
 
         return stripe.subscriptions.create({
             customer: customer_id,
-            items: [{plan: 'plan_D63LEzDXDp9o3Q'}],
+            items: [{plan: functions.config().stripe.plan}],
             trial_period_days: 7
         });
     })
     .then((subscription) => {
+        console.log("Stripe subscription created: " + subscription.id)
         subscription_id = subscription.id
         //initialize database
         var userObject = {
@@ -37,7 +45,7 @@ exports.create = functions.auth.user().onCreate((user) => {
                 email : user.email,
             },
             subscription: {
-                created: user.metadata.creationTime,
+                created: admin.firestore.FieldValue.serverTimestamp(),
                 active: true,
                 has_upgraded: false,
                 pending_cancel: false,
@@ -63,14 +71,30 @@ exports.create = functions.auth.user().onCreate((user) => {
         return userRef.set(userObject)
     })
     .then(() => {
-        console.log("Write successful!")
-        return;
+        console.log("Firestore write successful: users/" + user.uid)
+         //Should add email to Buttondown.email here
+        return 0;
     })
     .catch((error) => {
         // Deal with an error
         console.error("Error writing document: ", error)
     });
 });
+
+//upgrade 
+    //[if within free trial, just add payment source and trial_end_now: true]
+    //[if after free trial, create a subscription and charge using payment source (update customer source)]
+
+//cancel subscription 
+    //[update to delete subscription on end date]
+
+//stripe webhook
+    //subscription canceled
+    //customer source updated
+    //customer created
+
+//update payment info
+    //add source brand and last 4 digits to firebase
 
 /*
 exports.fun = functions.https.onRequest((req, res) => {
